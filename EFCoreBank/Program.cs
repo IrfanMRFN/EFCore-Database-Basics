@@ -12,35 +12,36 @@ optionsBuilder.UseSqlServer(connectionString);
 // Instantiate the context inside a 'using' statement so it safely closes the connection when done
 using var dbContext = new BankContext(optionsBuilder.Options);
 Console.WriteLine("Connected to SQL Server!");
-Console.WriteLine("Fetching account from database...");
+Console.WriteLine("Fetching account and transaction history... \n");
 
-// READ: Find the first account where the name matches
+// READ WITH RELATIONS (Eager Loading)
 Account? myAccount = await dbContext.Accounts
+    .Include(a => a.Transactions)
     .FirstOrDefaultAsync(a => a.AccountHolder == "Muhammad Irfan");
 
 if (myAccount != null)
 {
-    Console.WriteLine($"Found Account ID: {myAccount.Id} for {myAccount.AccountHolder}");
+    Console.WriteLine("========================");
+    Console.WriteLine($" ACCOUNT STATEMENT FOR: {myAccount.AccountHolder}");
+    Console.WriteLine($" ACCOUNT ID: {myAccount.Id}");
+    Console.WriteLine($" CURRENT BALANCE: Rp {myAccount.Balance}");
+    Console.WriteLine("========================\n");
 
-    // CREATE: Build a new Transaction object
-    Transaction newDeposit = new Transaction
+    Console.WriteLine("--- TRANSACTION HISTORY ---");
+
+    if (myAccount.Transactions.Count == 0)
     {
-        Amount = 500000m,
-        // LINK: Foreign Key that connects this transaction to the specific acount
-        AccountId = myAccount.Id
-    };
-
-    // UPDATE: Change the account balance in C# memory
-    myAccount.Balance += newDeposit.Amount;
-
-    // TRACK: Tell EF Core about the new transaction
-    dbContext.Transactions.Add(newDeposit);
-
-    // COMMIT: Push all changes to SQL Server
-    await dbContext.SaveChangesAsync();
-
-    Console.WriteLine($"Successfully deposited Rp {newDeposit.Amount}");
-    Console.WriteLine($"New Balance is: Rp {myAccount.Balance}");
+        Console.WriteLine("No transactions found.");
+    }
+    else
+    {
+        foreach (Transaction tx in myAccount.Transactions)
+        {
+            // Using date formatting 'g'
+            Console.WriteLine($"[{tx.CreatedAt:g}] Transaction ID: {tx.Id} | Amount: Rp {tx.Amount}");
+        }
+    }
+    Console.WriteLine("========================");
 }
 else
 {
