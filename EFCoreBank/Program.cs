@@ -12,17 +12,37 @@ optionsBuilder.UseSqlServer(connectionString);
 // Instantiate the context inside a 'using' statement so it safely closes the connection when done
 using var dbContext = new BankContext(optionsBuilder.Options);
 Console.WriteLine("Connected to SQL Server!");
+Console.WriteLine("Fetching account from database...");
 
-// Create C# Object that represent a row in the db table
-Account newAccount = new Account
+// READ: Find the first account where the name matches
+Account? myAccount = await dbContext.Accounts
+    .FirstOrDefaultAsync(a => a.AccountHolder == "Muhammad Irfan");
+
+if (myAccount != null)
 {
-    AccountHolder = "Muhammad Irfan",
-    Balance = 1500000m
-};
+    Console.WriteLine($"Found Account ID: {myAccount.Id} for {myAccount.AccountHolder}");
 
-// Tell Entity Framework to track this new object for insertion
-dbContext.Accounts.Add(newAccount);
+    // CREATE: Build a new Transaction object
+    Transaction newDeposit = new Transaction
+    {
+        Amount = 500000m,
+        // LINK: Foreign Key that connects this transaction to the specific acount
+        AccountId = myAccount.Id
+    };
 
-// Generate and execute the SQL INSERT command
-await dbContext.SaveChangesAsync();
-Console.WriteLine($"Successfully created account for {newAccount.AccountHolder} in the database!");
+    // UPDATE: Change the account balance in C# memory
+    myAccount.Balance += newDeposit.Amount;
+
+    // TRACK: Tell EF Core about the new transaction
+    dbContext.Transactions.Add(newDeposit);
+
+    // COMMIT: Push all changes to SQL Server
+    await dbContext.SaveChangesAsync();
+
+    Console.WriteLine($"Successfully deposited Rp {newDeposit.Amount}");
+    Console.WriteLine($"New Balance is: Rp {myAccount.Balance}");
+}
+else
+{
+    Console.WriteLine("Account not found!");
+}
